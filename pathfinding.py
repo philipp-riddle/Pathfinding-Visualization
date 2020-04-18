@@ -8,43 +8,17 @@ class Dijkstras:
         self.startNode = start
         self.stopNode = stop
         self.gui = gui
-        # self.visited = [[0 for x in range(len(tiles))] for y in range(len(tiles[0]))] # to support non-square tile meshes => len(tiles[0])
-
+        self.running = False # defines if the algorithm is still not finished
         self.frontierNodes = [self.startNode] # the tiles that are currently exploring - initialize with startNode
 
-    # returns None if no path could be found
-    def start(self):
-        return self._checkTile(self.startNode) # recursive algorithm
-
-    def _checkTile(self, tile):
-        path = None
-
-        while (path is None):
-            frontiers = self.frontierNodes.copy()
-            self.frontierNodes = [] # reset frontiers so the for loop below is not an endless loop
-
-            for node in frontiers:
-                if node.x != self.startNode.x and node.y != self.startNode.y:
-                    self.gui.get_rectangle(node.x, node.y).setColor('gray') # set prior frontier to color gray
-                print("Exploring nodes around ", node.x, ':', node.y)
-                self.explore_nodes_around(node) # generate frontier nodes
-            path = self.check_frontier_nodes()
-
-            if path is not None:
-                return path
-            
-            print("Left to visit: ", self.leftToVisit)
-            time.sleep(1)
-        
-
-
-        return None
-
+    # do one algorithm step. returns None if path cannot be found; returns PathfindingTile array if path was found
     def step(self):
+        self.running = True
 
-        if len(self.frontierNodes) == 0: # empty 
-            print("Could not find path!")
-            return
+        if len(self.frontierNodes) == 0: # no frontier nodes - can't explore any further and therefore cannot find a path
+            self.running = False
+
+            return None
 
         frontiers = self.frontierNodes.copy()
         self.frontierNodes = [] # reset frontiers so the for loop below is not an endless loop
@@ -52,14 +26,9 @@ class Dijkstras:
         for node in frontiers:
             self.explore_nodes_around(node) # generate frontier nodes
             
-        path = self.check_frontier_nodes()
+        return self.check_frontier_nodes()
 
-        if path is not None:
-            return path
-        
-        print("Left to visit: ", self.leftToVisit)
-
-    # this function explores the nodes around a tile
+    # explore all the nodes around a tile
     def explore_nodes_around(self, tile):
         # create a "square" around the current node and takes care of boundaries
         for x in range(max(0, tile.x - 1), min(len(self.tiles), tile.x + 2)):
@@ -67,16 +36,13 @@ class Dijkstras:
                 t = self.tiles[x][y]
 
                 if (tile.x == x and tile.y == y) or t.visited(): # the tile itself or if the tile was already visited => skip it
-                    # print((tile.x == x and tile.y == y), ", ", t.visited)
                     continue
 
                 if t.solid: # tile is a solid block, skip it
-                    print(t.x, ":", t.y, " is solid; skip it")
                     t.distance = -2 # set it to a number which signalizes that the tile has been visited
                     continue
 
                 distance = self.calculate_distance_between(tile, t)
-                # print(tile.x, ":", tile.y, " => ", t.x, ":", t.y, "; distance = ", distance)
 
                 if t.distance > distance or t.distance == -1: # shorter path detected; override the previous tile plus distance
                     t.previous = tile
@@ -85,9 +51,12 @@ class Dijkstras:
                 if t in self.frontierNodes: # only got better path - do nothing further
                     continue
 
-                # print(x, ", ", y, ": ", t.distance)
                 self.leftToVisit -= 1
-                self.gui.get_rectangle(x, y).setColor('yellow')
+                current = self.gui.get_rectangle(x, y)
+
+                if self.gui.start != current and self.gui.stop != current: # do not color the start/stop node
+                    current.setColor('yellow')
+
                 if t not in self.frontierNodes:
                     self.frontierNodes.append(t)
 
@@ -98,6 +67,7 @@ class Dijkstras:
     def check_frontier_nodes(self):
         for node in self.frontierNodes:
             if node.stop: # node is stop node
+                self.running = False
                 return self.get_path(node)
 
         return None
